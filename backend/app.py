@@ -9,6 +9,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from model_utils import load_model, preprocess_image
 import matplotlib.cm as cm
+from datetime import datetime
+import csv
+import os
+
+log_file = 'count_log.csv'
+if not os.path.exists(log_file):
+    with open(log_file, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['timestamp', 'count'])
+
 
 app = Flask(__name__)
 CORS(app)
@@ -27,6 +37,14 @@ def predict():
         output = model(input_tensor)
         count = float(output.sum().item())
         heatmap = output.squeeze().cpu().numpy()
+
+        # saving data for time series
+        timestamp = datetime.now().isoformat(timespec='seconds')
+    
+        # Save count and time
+        with open(log_file, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([timestamp, round(count, 2)])
 
     # Convert heatmap to base64 PNG
     # fig, ax = plt.subplots()
@@ -69,6 +87,14 @@ def predict():
         'count': round(count, 2),
         'heatmap': heatmap_b64
     })
+
+@app.route('/history', methods=['GET'])
+def get_history():
+    with open(log_file, 'r') as f:
+        reader = csv.DictReader(f)
+        data = list(reader)
+    return jsonify(data)
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
