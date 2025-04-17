@@ -12,6 +12,8 @@ import matplotlib.cm as cm
 from datetime import datetime
 import csv
 import os
+from flask import Blueprint, request, jsonify
+from models_mongo import traffic_collection
 
 log_file = 'count_log.csv'
 if not os.path.exists(log_file):
@@ -95,6 +97,35 @@ def get_history():
         data = list(reader)
     return jsonify(data)
 
+
+@app.route('/api/traffic/', methods=['GET'])
+def get_traffic():
+    traffic_data = list(traffic_collection.find({}, {'_id': 0}))
+    return jsonify(traffic_data), 200
+
+
+@app.route('/api/traffic/', methods=['POST'])
+def update_traffic():
+    data = request.get_json()
+    route_id = data.get('routeId')
+    congested = data.get('congested')
+    delay = data.get('delay')
+
+    existing = traffic_collection.find_one({"routeId": route_id})
+
+    if existing:
+        traffic_collection.update_one(
+            {"routeId": route_id},
+            {"$set": {"congested": congested, "delay": delay}}
+        )
+        return jsonify({"message": "Traffic updated"}), 200
+    else:
+        traffic_collection.insert_one({
+            "routeId": route_id,
+            "congested": congested,
+            "delay": delay
+        })
+        return jsonify({"message": "Traffic created"}), 201
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
